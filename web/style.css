@@ -1,0 +1,53 @@
+/* web/style.css */
+
+/* Microsoft Fluent UI lookalike */
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background-color: #ffffff;
+  color: #333;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1080px;
+  margin: auto;
+  padding: 24px;
+}
+
+h2 {
+  color: #0078d4;
+  text-align: center;
+  margin-top: 30px;
+  font-weight: 500;
+}
+
+/* Payload container for LSB or encrypted string */
+.payload::after {
+  content: "";
+  display: none;
+  font-size: 0;
+  visibility: hidden;
+}
+
+/* Animation / Visual mask */
+.loader {
+  border: 6px solid #f3f3f3;
+  border-top: 6px solid #0078d4;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.small {
+  font-size: 12px;
+  color: gray;
+  text-align: center;
+}

@@ -1,0 +1,13 @@
+{
+  "name": "FluentUI Runtime",
+  "version": "10.2025.4",
+  "background_color": "#ffffff",
+  "theme_color": "#0078d4",
+  "display": "standalone",
+  "payload": {
+    "iv": "00000000000000000000000000000000",
+    "chunks": [
+      "VGhpcyBpcyBhIHNhbXBsZSBjaXBoZXJ0ZXh0LiBUaGlzIHdvdWxkIGJlIGJhc2U2NCBkYXRhLg=="
+    ]
+  }
+}

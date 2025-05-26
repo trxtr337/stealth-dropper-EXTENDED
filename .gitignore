@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# Virtualenv
+.venv/
+
+# VS Code
+.vscode/
+
+# Secrets
+.env
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.zip
+*.tar.gz
+
+# Output
+*.log
+*.out
+*.bin

