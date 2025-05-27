@@ -32,7 +32,7 @@ $AES.KeySize = 256
 $AES.BlockSize = 128
 
 # 🔐 AES Key must match .env ENCRYPTION_KEY
-$key = [Text.Encoding]::UTF8.GetBytes("Zxcvbnm1234567890Zxcvbnm1234567890")
+$key = [Text.Encoding]::UTF8.GetBytes("Zxcvbnm1234567890Zxcvbnm12345678")
 $AES.Key = $key
 $AES.IV = $iv
 $Decryptor = $AES.CreateDecryptor()

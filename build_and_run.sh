@@ -90,6 +90,13 @@ echo "[+] Ducky HID command saved to $DUCKY_FILE"
 
 cd "$WEB_DIR"
 echo "[*] Serving payloads at http://$IP:$PORT"
+
+if lsof -i TCP:"$PORT" -sTCP:LISTEN -t >/dev/null ; then
+  echo "[*] Port $PORT is occupied. Killing process(es)..."
+  lsof -i TCP:"$PORT" -sTCP:LISTEN -t | xargs kill -9
+  echo "[*] Freed port $PORT."
+fi
+
 python3 -m http.server "$PORT" &
 
 cd "$PROJECT_DIR"
