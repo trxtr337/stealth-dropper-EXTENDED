@@ -1,12 +1,12 @@
 {
   "last_used": {
-    "ip": "192.168.0.191",
-    "port_shell": 4444,
+    "ip": "192.168.0.151",
+    "port_shell": 4555,
     "port_serve": 8080,
-    "os": "linux",
-    "payload": "bash_reverse",
+    "os": "windows",
+    "payload": "shell_reverse",
     "delivery": "css",
-    "timestamp": "2025-05-27T10:42:59Z"
+    "timestamp": "2025-05-27T10:44:54Z"
   },
   "options": {
     "stealth_level": "max",
