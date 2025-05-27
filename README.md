@@ -55,7 +55,6 @@ pip install -r requirements.txt
 
 ### 1. Set encryption key in `.env`
 
-```
 ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm12345678
 ```
 
