@@ -97,7 +97,7 @@ if lsof -i TCP:"$PORT" -sTCP:LISTEN -t >/dev/null ; then
   echo "[*] Freed port $PORT."
 fi
 
-python3 -m http.server "443" &
+python3 -m http.server "$PORT" &
 
 cd "$PROJECT_DIR"
 
