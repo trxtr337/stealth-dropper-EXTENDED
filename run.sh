@@ -217,3 +217,15 @@ echo -e "\e[1;36mnc -lvnp $PORT_SHELL\e[0m"
 log "To stop the web server, run:"
 echo -e "\e[1;36mkill $SERVER_PID\e[0m"
 log "HTTP server logs are saved to: output/http_server.log"
+
+
+# --- [ AUTO KILL HTTP SERVER ON EXIT ] ---
+cleanup() {
+  if [[ -n "${SERVER_PID:-}" ]] && ps -p $SERVER_PID &>/dev/null; then
+    log "Stopping HTTP server (PID $SERVER_PID)..."
+    kill $SERVER_PID 2>/dev/null
+  fi
+}
+trap cleanup EXIT
+log "Press Ctrl+C to stop the web server and exit..."
+while true; do sleep 60; done
