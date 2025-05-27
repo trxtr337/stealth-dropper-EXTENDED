@@ -27,8 +27,28 @@ stealth-dropper/
 ```
 
 ---
-
 ## 🚀 How to Use
+
+### 0. [RECOMMENDED] Setup Python virtual environment
+
+Before running, it is **highly recommended** to use a Python virtual environment to isolate dependencies:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/trxtr337/stealth-dropper-EXTENDED.git
+cd stealth-dropper-EXTENDED
+
+# 2. Create a virtual environment
+python3 -m venv venv
+
+# 3. Activate the environment:
+# For Linux/macOS:
+source venv/bin/activate
+# For Windows:
+venv\\Scripts\\activate
+
+# 4. Install required dependencies
+pip install -r requirements.txt
 
 ### 1. Set encryption key in `.env`
 ```
