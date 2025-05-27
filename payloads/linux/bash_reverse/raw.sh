@@ -1,5 +1,3 @@
-# payloads/linux/bash_reverse/raw.sh
-
 #!/bin/bash
 # Lightweight reverse shell (Linux, 2025-safe)
 # No bash history leak, works in memory, clean disconnect

