@@ -32,7 +32,7 @@ stealth-dropper/
 
 ### 1. Set encryption key in `.env`
 ```
-ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm1234567890
+ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm12345678
 ```
 
 ### 2. Run the builder
