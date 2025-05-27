@@ -27,3 +27,5 @@ config/
 *.zip
 *.tar.gz
 
+# Logs
+*.log
