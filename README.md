@@ -27,6 +27,9 @@ stealth-dropper/
 ```
 
 ---
+
+
+
 ## 🚀 How to Use
 
 ### 0. [RECOMMENDED] Setup Python virtual environment
@@ -51,6 +54,7 @@ venv\\Scripts\\activate
 pip install -r requirements.txt
 
 ### 1. Set encryption key in `.env`
+
 ```
 ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm12345678
 ```
