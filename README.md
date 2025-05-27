@@ -16,7 +16,7 @@
 ## 📁 Project Structure
 ```
 stealth-dropper/
-├── build_and_run.sh        # main automation script
+├── run.sh                  # main automation script
 ├── config/                 # config/settings.json
 ├── core/                   # anti_vm.ps1
 ├── output/                 # generated stagers + logs
@@ -37,12 +37,12 @@ ENCRYPTION_KEY=Zxcvbnm1234567890Zxcvbnm12345678
 
 ### 2. Run the builder
 ```bash
-chmod +x build_and_run.sh
-./build_and_run.sh
+chmod +x run.sh
+./run.sh
 ```
 
 You'll be prompted to select:
-- Target IP and port
+- IP and PORTS
 - Target OS
 - Payload type (e.g. shell_reverse)
 - Delivery method (css / manifest / png)
