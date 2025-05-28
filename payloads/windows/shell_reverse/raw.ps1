@@ -1,3 +1,6 @@
+#THIS RAW IS NOT WORKING PROPERLY WITH TEMPLATE IF YOU SEE THIS MENTION IN CHAT
+
+
 # Reverse shell (passive mode) — executed via Add-Type wrapper
 # This script assumes input is a base64-encoded command, separated by \n
 
