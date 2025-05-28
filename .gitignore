@@ -1,25 +1,59 @@
-# Python
+# === Python ===
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.egg-info/
+*.pyd
+*.pyo
 
-# Virtualenv
+# === Virtualenv ===
 venv/
 
-# VS Code
+# === VS Code ===
 .vscode/
 
-# Secrets
+# === Secrets ===
 .env
+*.key
+*.pem
 
-# Build artifacts
+# === Build Artifacts ===
 *.exe
 *.dll
 *.so
 *.zip
 *.tar.gz
+*.out
+*.bin
+*.dat
 
-# Logs
+# === Output ===
+output/
+web/*.css
+web/*.json
+web/*.png
+build_history.log
+
+# === Logs ===
 *.log
+
+# === Stage Payloads ===
+encrypted_stage2.txt
+final_stage1.*
+tmp_*
+*.cipher
+*.plain
+*.shred
+
+# === Bash Artifacts ===
+*.bak
+*.swp
+*.swo
+
+# === PyInstaller / Nim Cache ===
+__pycache__/
+*.spec
+build/
+dist/
+*.nimcache/
+*.nims
+*.nims.json
