@@ -1,41 +1,59 @@
 import base64
 import os
 import sys
+import hashlib
+import zlib
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad
-from dotenv import load_dotenv
-from dotenv import dotenv_values
 
-# Явно загружаем переменные из .env, игнорируя окружение
-config = dotenv_values(os.path.join(os.path.dirname(__file__), '..', '.env'))
-
-key = config.get("ENCRYPTION_KEY")
-
-#print(f"[DEBUG] Running from: {os.getcwd()}")
-#print(f"[DEBUG] Loading .env from: {os.path.join(os.path.dirname(__file__), '..', '.env')}")
-#print(f"[DEBUG] Loaded ENCRYPTION_KEY: '{key}' Length: {len(key) if key else 'None'}")
-
-if not key or len(key) != 32:
-    print("[-] ENCRYPTION_KEY must be 32 characters long in .env")
-    sys.exit(1)
-
-key = key.encode()
-
-if len(sys.argv) != 2:
-    print("Usage: python3 encrypt_aes.py <input_file>")
+# ================================
+# Validate CLI arguments
+# ================================
+if len(sys.argv) != 3:
+    print("Usage: python3 encrypt_aes.py <input_file> <hex_key>")
     sys.exit(1)
 
 input_path = sys.argv[1]
+key_hex = sys.argv[2]
 
-with open(input_path, "rb") as f:
-    plaintext = f.read()
+if len(key_hex) != 64:
+    print("[-] ENCRYPTION_KEY must be 64 hex characters (32 bytes)")
+    sys.exit(1)
 
+# Convert key from hex to bytes
+key = bytes.fromhex(key_hex)
+
+# ================================
+# Read and prepare the input
+# ================================
+try:
+    with open(input_path, "rb") as f:
+        plaintext = f.read()
+except Exception as e:
+    print(f"[-] Failed to read file: {e}")
+    sys.exit(1)
+
+# Add SHA256 hash for integrity check (32 bytes prefix)
+hash_digest = hashlib.sha256(plaintext).digest()
+
+# Compress the payload (adds obfuscation and size reduction)
+compressed = zlib.compress(plaintext)
+
+# Combine hash + compressed payload
+data = hash_digest + compressed
+
+# ================================
+# Encrypt using AES-CBC
+# ================================
 iv = os.urandom(16)
 cipher = AES.new(key, AES.MODE_CBC, iv)
-ciphertext = cipher.encrypt(pad(plaintext, AES.block_size))
-b64_cipher = base64.b64encode(ciphertext).decode()
+ciphertext = cipher.encrypt(pad(data, AES.block_size))
+
+# ================================
+# Output: IV as hex + base64 ciphertext
+# ================================
 iv_hex = iv.hex()
+b64_cipher = base64.b64encode(ciphertext).decode()
 
-#print(f"[DEBUG] Encryption successful. IV: {iv_hex}")
-
+# Final format: IV_HEX:BASE64_CIPHERTEXT
 print(f"{iv_hex}:{b64_cipher}")

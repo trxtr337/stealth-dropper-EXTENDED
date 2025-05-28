@@ -1,0 +1,12 @@
+{
+  "last_used": {
+    "web_ip": "192.168.0.11",
+    "lhost": "192.168.0.11",
+    "lport": 4444,
+    "port_serve": 8080,
+    "os": "linux",
+    "payload": "bash_reverse",
+    "delivery": "css",
+    "timestamp": "2025-05-28T19:47:08Z"
+  }
+}

